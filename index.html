@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12372a">
+  <title>WasteLink | Recyclables, collected</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">W</div>
+        <div>
+          <h1>WasteLink</h1>
+          <p class="tagline">Good materials. Better connections.</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="dashboard" aria-label="Collection dashboard">
+      <div class="stat"><span class="stat-value" id="open-count">0</span><span class="stat-label">Open reports</span></div>
+      <div class="stat"><span class="stat-value" id="scheduled-count">0</span><span class="stat-label">Scheduled</span></div>
+      <div class="stat"><span class="stat-value" id="completed-count">0</span><span class="stat-label">Completed</span></div>
+      <div class="stat"><span class="stat-value" id="estimated-total">0 kg</span><span class="stat-label">Estimated total</span></div>
+      <div class="stat"><span class="stat-value" id="actual-total">0 kg</span><span class="stat-label">Actually collected</span></div>
+      <p class="stat-note">Estimated total includes reports entered in kg only. Bag estimates stay separate; actual weights are recorded at collection.</p>
+    </section>
+
+    <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
+
+    <nav class="tabs" role="tablist" aria-label="WasteLink">
+      <button class="tab-button" id="report-tab" type="button" role="tab" aria-selected="true" aria-controls="report-panel">Report waste</button>
+      <button class="tab-button" id="recycler-tab" type="button" role="tab" aria-selected="false" aria-controls="recycler-panel" tabindex="-1">Receive waste</button>
+    </nav>
+
+    <section class="panel" id="report-panel" role="tabpanel" aria-labelledby="report-tab">
+      <h2>Report recyclable waste</h2>
+      <p class="intro">Share what you have and where it can be collected.</p>
+      <div class="field">
+        <label for="track-reference">Track report</label>
+        <form id="track-form" class="quantity-row">
+          <input id="track-reference" name="reference" maxlength="20" placeholder="e.g. WL-0001" required>
+          <button class="button" type="submit">Check status</button>
+        </form>
+        <p class="card-details" id="track-result" aria-live="polite" hidden></p>
+      </div>
+      <form id="report-form">
+        <div class="field">
+          <label for="report-title">Report title</label>
+          <input id="report-title" name="title" maxlength="80" placeholder="e.g. Clean plastic bottles" required>
+        </div>
+        <div class="field">
+          <label for="report-category">Category</label>
+          <select id="report-category" name="category" required>
+            <option value="e-waste">E-waste</option>
+            <option value="batteries">Batteries</option>
+            <option value="metals">Metals</option>
+            <option value="plastics">Plastics</option>
+            <option value="paper/cardboard">Paper/cardboard</option>
+            <option value="illegal-dumping">Illegal dumping</option>
+            <option value="hazardous">Hazardous</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="report-quantity">Estimated quantity</label>
+          <div class="quantity-row">
+            <input id="report-quantity" name="quantity" type="number" min="0.1" max="100000" step="0.1" inputmode="decimal" placeholder="e.g. 5" required>
+            <select id="report-unit" name="unit" aria-label="Quantity unit">
+              <option value="kg">kg</option>
+              <option value="bags">bags</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="report-description">Description</label>
+          <textarea id="report-description" name="description" maxlength="500" placeholder="Add useful details about condition, access, or packing." required></textarea>
+        </div>
+        <div class="field">
+          <label for="report-phone">Your phone <span class="subtle">(optional)</span></label>
+          <input id="report-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="Phone number">
+        </div>
+        <div class="field">
+          <span class="field-label">Collection location</span>
+          <p class="location-text" id="report-location-text" aria-live="polite">No location selected yet.</p>
+          <div class="button-row">
+            <button class="button secondary" id="report-gps" type="button">Use my GPS</button>
+          </div>
+          <div class="map" id="report-map" aria-label="Tap the map to select the waste location">
+            <div class="map-fallback">Map needs an internet connection to load. You can still use GPS.</div>
+          </div>
+          <p class="map-help">Tap the map to set the collection point. Your location is stored on this device.</p>
+        </div>
+        <button class="button full-button" type="submit">Save report</button>
+      </form>
+    </section>
+
+    <section class="panel" id="recycler-panel" role="tabpanel" aria-labelledby="recycler-tab" hidden>
+      <h2>Receive recyclable materials</h2>
+      <p class="intro">Nearby reports are sorted by distance from your location.</p>
+      <div class="button-row">
+        <button class="button secondary" id="recycler-gps" type="button">Use my GPS location</button>
+      </div>
+      <p class="location-text" id="recycler-location-text" aria-live="polite">Using central Cape Town as the starting point. Set your GPS for accurate distances.</p>
+      <div class="map" id="recycler-map" aria-label="Map of reported recyclable waste">
+        <div class="map-fallback">Map needs an internet connection to load.</div>
+      </div>
+      <div class="legend" aria-label="Map status legend">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--available)"></span>Available</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--scheduled)"></span>Scheduled</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--completed)"></span>Completed</span>
+      </div>
+      <div class="filter-row">
+        <div>
+          <label class="field-label" for="receiver-filter">Organisation type</label>
+          <select id="receiver-filter">
+            <option value="all">All receiver types</option>
+            <option value="E-waste recycler">E-waste recycler</option>
+            <option value="Paper recycler">Paper recycler</option>
+            <option value="Metal recycler">Metal recycler</option>
+            <option value="Plastic recycler">Plastic recycler</option>
+            <option value="Battery handler">Battery handler</option>
+            <option value="Municipality">Municipality</option>
+            <option value="Hazardous waste facility">Hazardous waste facility</option>
+            <option value="Waste collector">Waste collector</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="category-filter">Filter by category</label>
+          <select id="category-filter">
+            <option value="all">All categories</option>
+            <option value="e-waste">E-waste</option>
+            <option value="batteries">Batteries</option>
+            <option value="metals">Metals</option>
+            <option value="plastics">Plastics</option>
+            <option value="paper/cardboard">Paper/cardboard</option>
+            <option value="illegal-dumping">Illegal dumping</option>
+            <option value="hazardous">Hazardous</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <p class="subtle" id="results-count" aria-live="polite"></p>
+      </div>
+      <ul class="report-list" id="report-list" aria-live="polite"></ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">WasteLink helps communities connect reusable materials with local recyclers.</footer>
+
+  <dialog id="action-dialog" aria-labelledby="dialog-title">
+    <form class="dialog-content" id="action-form">
+      <h2 id="dialog-title"></h2>
+      <div id="dialog-fields"></div>
+      <p class="dialog-error" id="dialog-error" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button class="button secondary" id="dialog-cancel" type="button">Cancel</button>
+        <button class="button" type="submit" id="dialog-submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
